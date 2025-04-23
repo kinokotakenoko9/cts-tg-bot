@@ -2,14 +2,13 @@ module ctsbot
 
 go 1.23.4
 
-require (
-	github.com/go-telegram/bot v1.14.2
-	golang.org/x/net v0.39.0
-)
+require github.com/go-telegram/bot v1.14.2
+
+require golang.org/x/net v0.39.0 // indirect
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dgraph-io/badger/v4 v4.7.0 // indirect
+	github.com/dgraph-io/badger/v4 v4.7.0
 	github.com/dgraph-io/ristretto/v2 v2.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
