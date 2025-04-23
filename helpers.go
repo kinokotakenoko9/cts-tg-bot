@@ -5,13 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/go-telegram/ui/keyboard/inline"
 )
 
 // helpers
+
+// msgs
 
 func sendMessage(ctx context.Context, b *bot.Bot, update *models.Update, msg string) {
 	b.SendMessage(ctx, &bot.SendMessageParams{
@@ -28,9 +33,60 @@ func sendInfo(ctx context.Context, b *bot.Bot, update *models.Update) {
 	sendMessage(ctx, b, update, "Type /start to start")
 }
 
+func sendButtonList(ctx context.Context, b *bot.Bot, update *models.Update, names []string, text string, onSelect inline.OnSelect) {
+	citiesInlineKeyboard := inline.New(b, inline.NoDeleteAfterClick()) // TODO: bug here
+
+	for _, name := range names {
+		citiesInlineKeyboard.Row().Button(name, []byte(name), onSelect)
+	}
+
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      update.Message.Chat.ID,
+		Text:        text,
+		ReplyMarkup: citiesInlineKeyboard,
+	})
+}
+
 // misc
 func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
+
+func remove[T comparable](l []T, item T) []T {
+	out := make([]T, 0)
+	for _, element := range l {
+		if element != item {
+			out = append(out, element)
+		}
+	}
+	return out
+}
+
+func loadCities() error {
+	data, err := os.ReadFile("cities.json")
+	if err != nil {
+		log.Println("Error: reading file: ", err)
+		return err
+	}
+
+	err = json.Unmarshal(data, &cities)
+	if err != nil {
+		fmt.Println("Error unmarshalling JSON:", err)
+		return err
+	}
+
+	return nil
+}
+
+func getCitiesWithPrefix(prefix string) []string {
+	var result []string
+	lowerPrefix := strings.ToLower(prefix)
+	for city, _ := range cities {
+		if strings.HasPrefix(strings.ToLower(city), lowerPrefix) {
+			result = append(result, city)
+		}
+	}
+	return result
+}
 
 // interacting with database <start>
 func getDBKey(chatID int64) []byte {
