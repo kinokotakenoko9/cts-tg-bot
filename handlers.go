@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -39,6 +41,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		switch session.Step {
 		case 0: // line: user was asked where from
 
+			// sending DeparturePoint
 			// show availible cities
 			foundCities := getCitiesWithPrefix(msg)
 			if len(foundCities) == 0 {
@@ -60,6 +63,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 			})
 		case 1: // line: user was asked where to
 
+			// sending ArrivalPoint
 			// show availible cities
 			foundCities := getCitiesWithPrefix(msg)
 			if len(foundCities) == 0 {
@@ -79,15 +83,56 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 			foundCities = remove(foundCities, form.DeparturePoint)
 
-			sendButtonList(ctx, b, update, foundCities, fmt.Sprintf("Результаты для \"%s\":", msg), func(ctx context.Context, bot *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+			sendButtonList(ctx, b, update, foundCities, fmt.Sprintf("Результаты для \"%s\":", msg), func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 				if err := updateLastForm(chatID, FormUpdate{ArrivalPoint: strPtr(string(data))}); err != nil {
-					log.Print("Error: start:1 could not update last form", err)
+					log.Print("Error: start:1,0 could not update last form", err)
 					return
 				}
 
+				// sending DepartureDate
 				sendMessage(ctx, b, update, fmt.Sprintf("Маршрут выбран:\n%s -> %s", form.DeparturePoint, string(data)))
-				updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
+				sendDatePicker(ctx, b, update, "Выберите дату отправления.", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, date time.Time) {
+					d := date.Format("2006-01-02")
+
+					if err := updateLastForm(chatID, FormUpdate{DepartureDate: &date}); err != nil {
+						log.Print("Error: start:1.1 could not update last form", err)
+						return
+					}
+
+					b.SendMessage(ctx, &bot.SendMessageParams{
+						ChatID: chatID,
+						Text:   "Вы выбрали:  " + d,
+					})
+
+					// sending CarriageType
+					sendButtonList(ctx, b, update, []string{"Любой", "Плацкарт", "Купе"}, "Какой тип вагона вас устроит?", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+						if err := updateLastForm(chatID, FormUpdate{CarriageType: strPtr(string(data))}); err != nil {
+							log.Print("Error: start:1.2 could not update last form", err)
+							return
+						}
+
+						sendMessage(ctx, b, update, "Сколько пассажиров?\n_(Введите число от 1 до 6)_")
+						updateSession(chatID, SessionUpdate{Step: intPtr(2)}) // next session step
+
+					})
+
+				})
+
 			})
+		case 2: // line: user was asked amount of passengers
+
+			numberOfPassengers, err := strconv.Atoi(msg)
+			if err != nil {
+				sendMessage(ctx, b, update, "_(Введите число от 1 до 6)_")
+				return
+			}
+
+			if err := updateLastForm(chatID, FormUpdate{NumberOfPassengers: intPtr(numberOfPassengers)}); err != nil {
+				log.Print("Error: start:2 could not update last form", err)
+				return
+			}
+
+			updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
 		default:
 			log.Println("Error: unknown session step state")
 			return

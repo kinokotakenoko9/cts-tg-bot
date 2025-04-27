@@ -7,10 +7,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/go-telegram/ui/datepicker"
 	"github.com/go-telegram/ui/keyboard/inline"
 )
 
@@ -20,8 +22,9 @@ import (
 
 func sendMessage(ctx context.Context, b *bot.Bot, update *models.Update, msg string) {
 	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   msg,
+		ChatID:    update.Message.Chat.ID,
+		Text:      msg,
+		ParseMode: models.ParseModeMarkdown,
 	})
 }
 
@@ -47,9 +50,24 @@ func sendButtonList(ctx context.Context, b *bot.Bot, update *models.Update, name
 	})
 }
 
+func sendDatePicker(ctx context.Context, b *bot.Bot, update *models.Update, text string, onSelect datepicker.OnSelectHandler) {
+	kb := datepicker.New(b, onSelect)
+
+	b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:      update.Message.Chat.ID,
+		Text:        text,
+		ReplyMarkup: kb,
+	})
+}
+
 // misc
 func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
+func datePtr(d time.Time) *time.Time {
+	year, month, day := d.Date()
+	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	return &dateOnly
+}
 
 func remove[T comparable](l []T, item T) []T {
 	out := make([]T, 0)
