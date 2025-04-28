@@ -10,7 +10,7 @@ type Form struct {
 	DepartureDate                 time.Time
 	CarriageType                  string
 	NumberOfPassengers            int    // invariant: 1..6
-	CompartmentNumber             int    // invariant: 1..9
+	CompartmentNumber             []int  // invariant: non-empty list of 1..9
 	ShelfType                     string // invariant: one of "any", "top", "bottom"
 	NumberOfPassengersTopShefl    int    // invariant: <= NumberOfPassengers
 	NumberOfPassengersBottomShefl int    // invariant: <= NumberOfPassengers
@@ -24,7 +24,7 @@ type FormUpdate struct {
 	DepartureDate                 *time.Time
 	CarriageType                  *string
 	NumberOfPassengers            *int
-	CompartmentNumber             *int
+	CompartmentNumber             *[]int
 	ShelfType                     *string
 	NumberOfPassengersTopShefl    *int
 	NumberOfPassengersBottomShefl *int

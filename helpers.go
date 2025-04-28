@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/go-telegram/bot"
@@ -22,9 +22,8 @@ import (
 
 func sendMessage(ctx context.Context, b *bot.Bot, update *models.Update, msg string) {
 	b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		Text:      msg,
-		ParseMode: models.ParseModeMarkdown,
+		ChatID: update.Message.Chat.ID,
+		Text:   msg,
 	})
 }
 
@@ -37,7 +36,7 @@ func sendInfo(ctx context.Context, b *bot.Bot, update *models.Update) {
 }
 
 func sendButtonList(ctx context.Context, b *bot.Bot, update *models.Update, names []string, text string, onSelect inline.OnSelect) {
-	citiesInlineKeyboard := inline.New(b, inline.NoDeleteAfterClick()) // TODO: bug here
+	citiesInlineKeyboard := inline.New(b, inline.NoDeleteAfterClick()) // TODO: bug here, remove inactive keyboards
 
 	for _, name := range names {
 		citiesInlineKeyboard.Row().Button(name, []byte(name), onSelect)
@@ -63,10 +62,31 @@ func sendDatePicker(ctx context.Context, b *bot.Bot, update *models.Update, text
 // misc
 func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
-func datePtr(d time.Time) *time.Time {
-	year, month, day := d.Date()
-	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-	return &dateOnly
+func bytesToIntsPtr(b []byte) *[]int {
+	ints := make([]int, len(b))
+	for i, v := range b {
+		ints[i] = int(v)
+	}
+	return &ints
+}
+func stringToCompartmentNumber(s string) ([]int, bool) {
+	parts := strings.Fields(s)
+	if len(parts) != 9 {
+		return nil, false
+	}
+
+	seen := make(map[int]bool)
+	ints := make([]int, 9)
+
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 1 || n > 9 || seen[n] {
+			return nil, false
+		}
+		seen[n] = true
+		ints[i] = n
+	}
+	return ints, true
 }
 
 func remove[T comparable](l []T, item T) []T {

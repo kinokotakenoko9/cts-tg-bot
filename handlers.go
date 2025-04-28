@@ -53,7 +53,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 				break
 			}
 
-			sendButtonList(ctx, b, update, foundCities, fmt.Sprintf("Результаты для \"%s\":", msg), func(ctx context.Context, bot *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+			sendButtonList(ctx, b, update, foundCities, fmt.Sprintf("Результаты для \"%s\":", msg), func(ctx context.Context, _ *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 				if err := updateLastForm(chatID, FormUpdate{DeparturePoint: strPtr(string(data))}); err != nil {
 					log.Print("Error: start:0 could not update last form", err)
 					return
@@ -83,7 +83,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 			foundCities = remove(foundCities, form.DeparturePoint)
 
-			sendButtonList(ctx, b, update, foundCities, fmt.Sprintf("Результаты для \"%s\":", msg), func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+			sendButtonList(ctx, b, update, foundCities, fmt.Sprintf("Результаты для \"%s\":", msg), func(ctx context.Context, _ *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 				if err := updateLastForm(chatID, FormUpdate{ArrivalPoint: strPtr(string(data))}); err != nil {
 					log.Print("Error: start:1,0 could not update last form", err)
 					return
@@ -91,7 +91,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 				// sending DepartureDate
 				sendMessage(ctx, b, update, fmt.Sprintf("Маршрут выбран:\n%s -> %s", form.DeparturePoint, string(data)))
-				sendDatePicker(ctx, b, update, "Выберите дату отправления.", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, date time.Time) {
+				sendDatePicker(ctx, b, update, "Выберите дату отправления.", func(ctx context.Context, _ *bot.Bot, mes models.MaybeInaccessibleMessage, date time.Time) {
 					d := date.Format("2006-01-02")
 
 					if err := updateLastForm(chatID, FormUpdate{DepartureDate: &date}); err != nil {
@@ -111,7 +111,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 							return
 						}
 
-						sendMessage(ctx, b, update, "Сколько пассажиров?\n_(Введите число от 1 до 6)_")
+						sendMessage(ctx, b, update, "Сколько пассажиров?\n(Введите число от 1 до 6)")
 						updateSession(chatID, SessionUpdate{Step: intPtr(2)}) // next session step
 
 					})
@@ -119,11 +119,11 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 				})
 
 			})
-		case 2: // line: user was asked amount of passengers
+		case 2: // line: user replied with amount of passengers
 
 			numberOfPassengers, err := strconv.Atoi(msg)
-			if err != nil {
-				sendMessage(ctx, b, update, "_(Введите число от 1 до 6)_")
+			if err != nil || !(numberOfPassengers >= 1 && numberOfPassengers <= 6) {
+				sendMessage(ctx, b, update, "(Введите число от 1 до 6)")
 				return
 			}
 
@@ -132,6 +132,52 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 				return
 			}
 
+			// sending CompartmentNumber
+			sendButtonList(ctx, b, update, []string{"Любой", "Не боковой", "Выбрать"}, "Какой отсек мест?", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+				compartmentNumber := []int{1, 2, 3, 4, 5, 6, 8, 9}
+				switch string(data) {
+				case "Любой":
+					compartmentNumber = []int{1, 2, 3, 4, 5, 6, 8, 9}
+				case "Не боковой":
+					compartmentNumber = []int{2, 3, 4, 5, 6, 8}
+				case "Выбрать":
+					sendMessage(ctx, b, update, "Перечислите отсек(и) через пробел (1-9)")
+					updateSession(chatID, SessionUpdate{Step: intPtr(3)}) // next session step
+					return
+				default:
+					log.Println("Error: unknown CompartmentNumber state")
+					return
+				}
+
+				if err := updateLastForm(chatID, FormUpdate{CompartmentNumber: &compartmentNumber}); err != nil {
+					log.Print("Error: start:2.0 could not update last form", err)
+					return
+				}
+
+				// sending ShelfType
+				sendShelfType(ctx, b, update, chatID)
+
+			})
+
+		case 3: // user chose CompartmentNumber
+
+			parsedCompartmentNumber, isValid := stringToCompartmentNumber(msg)
+			if !isValid {
+				sendMessage(ctx, b, update, "Перечислите отсек(и) через пробел (1-9)")
+				return
+			}
+
+			if err := updateLastForm(chatID, FormUpdate{CompartmentNumber: &parsedCompartmentNumber}); err != nil {
+				log.Print("Error: start:3.0 could not update last form", err)
+				return
+			}
+
+			// sending  ShelfType ... TODO
+			sendShelfType(ctx, b, update, chatID)
+
+		case 4: // user sent number for bottom shelf
+			updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
+		case 5: // user sent to track price change
 			updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
 		default:
 			log.Println("Error: unknown session step state")
@@ -141,6 +187,25 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		log.Println("Error: unknown command state")
 		return
 	}
+}
+
+func sendShelfType(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64) {
+	sendButtonList(ctx, b, update, []string{"Любое", "Указать нижние", "Указать верхние"}, "Какое размещение вас устроит?", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+		if err := updateLastForm(chatID, FormUpdate{ShelfType: strPtr(string(data))}); err != nil {
+			log.Print("Error: start:?.1 could not update last form", err)
+			return
+		}
+
+		if string(data) != "Любое" {
+			sendMessage(ctx, b, update, "Укажите количество пассажиров для нижней полки:\n(Введите число от 1 до 2)")
+			updateSession(chatID, SessionUpdate{Step: intPtr(4)}) // next session step
+			return
+		}
+
+		sendMessage(ctx, b, update, "Отслеживать изменение цены?\n(Введите да или нет)")
+		updateSession(chatID, SessionUpdate{Step: intPtr(5)}) // next session step
+
+	})
 }
 
 // when user typed `/start`
