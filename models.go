@@ -11,7 +11,7 @@ type Form struct {
 	CarriageType                  string
 	NumberOfPassengers            int    // invariant: 1..6
 	CompartmentNumber             []int  // invariant: non-empty list of 1..9
-	ShelfType                     string // invariant: one of "any", "top", "bottom"
+	ShelfType                     string // invariant: one of "Любое", "Указать нижние", "Указать верхние"
 	NumberOfPassengersTopShefl    int    // invariant: <= NumberOfPassengers
 	NumberOfPassengersBottomShefl int    // invariant: <= NumberOfPassengers
 	TrackPriceChange              bool

@@ -39,6 +39,10 @@ func sendFormSaved(ctx context.Context, b *bot.Bot, update *models.Update) {
 	sendMessage(ctx, b, update, "Ваш запрос сохранён! 🚆Я уведомлю вас, как только появятся билеты, соответствующие вашим параметрам.\n\nДля просмотра списка отслеживаемых билетов используйте /list.")
 }
 
+func sendNoForms(ctx context.Context, b *bot.Bot, update *models.Update) {
+	sendMessage(ctx, b, update, "Нет форм. зарегистрируйте форму через /start.") // TODO: better msg
+}
+
 func sendButtonList(ctx context.Context, b *bot.Bot, update *models.Update, names []string, text string, onSelect inline.OnSelect) {
 	citiesInlineKeyboard := inline.New(b) // TODO: bug here, remove inactive keyboards
 
@@ -92,6 +96,13 @@ func stringToCompartmentNumber(s string) ([]int, bool) {
 	}
 	return ints, true
 }
+func compartmentNumberToString(compartmentNumber []int) string {
+	s := []string{}
+	for _, n := range compartmentNumber {
+		s = append(s, strconv.Itoa(n))
+	}
+	return strings.Join(s, " ")
+}
 
 func remove[T comparable](l []T, item T) []T {
 	out := make([]T, 0)
@@ -136,6 +147,7 @@ func getDBKey(chatID int64) []byte {
 }
 
 // ---- sessions ----
+// checks if user has forms
 func userHasSession(chatID int64) (bool, error) {
 	key := getDBKey(chatID)
 
@@ -268,7 +280,7 @@ func insertEmptyForm(chatID int64) error {
 		return err
 	}
 
-	session.Forms = append(session.Forms, Form{})
+	session.Forms = append(session.Forms, Form{ID: len(session.Forms)})
 
 	jsn, err := json.Marshal(session)
 	if err != nil {

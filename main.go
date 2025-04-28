@@ -51,15 +51,13 @@ func main() {
 
 	b, err := bot.New(string(token), opts...)
 	if nil != err {
-		// panics for the sake of simplicity.
-		// you should handle this error properly in your code.
+
 		log.Println("Error: could not create bot: ", err)
 		return
 	}
 
-	// my handlers for app itself
 	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeCommand, startHandler)
-	// my handlers end
+	b.RegisterHandler(bot.HandlerTypeMessageText, "list", bot.MatchTypeCommand, listHandler)
 
 	b.Start(ctx)
 }

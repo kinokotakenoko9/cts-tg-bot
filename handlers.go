@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -302,5 +303,53 @@ func startHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		insertEmptyForm(chatID)
 
 		sendMessage(ctx, b, update, "Откуда вы хотите отправиться?")
+	}
+}
+
+// when user typed `/list`
+func listHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	chatID := update.Message.Chat.ID
+
+	hasSession, err := userHasSession(chatID)
+	if err != nil {
+		log.Print("Error: could not check if user has session: ", err)
+		return
+	}
+
+	if !hasSession {
+		sendNoForms(ctx, b, update)
+		return
+	}
+
+	session, err := getSession(chatID)
+	if err != nil {
+		log.Println("Error: could not get session: ", err)
+		return
+	}
+
+	if session.Command != "none" {
+		sendResposeIsInvalid(ctx, b, update)
+	} else {
+
+		sendMessage(ctx, b, update, "Список всех отслеживаемых форм:")
+		for _, form := range session.Forms {
+			seats := ""
+			if form.ShelfType == "Любое" {
+				seats = "Любые места"
+			} else {
+				seats = fmt.Sprintf("Нижних полок: %d\nВерхних полок: %d", form.NumberOfPassengersBottomShefl, form.NumberOfPassengersTopShefl)
+			}
+			formOptions := []string{}
+			if form.TrackPriceChange {
+				formOptions = append(formOptions, "Отслеживать цену")
+			}
+			if form.SuggestSimilarSeats {
+				formOptions = append(formOptions, "Предлагать похожие места")
+			} else {
+				formOptions = append(formOptions, "Только выбранные места")
+			}
+
+			sendMessage(ctx, b, update, fmt.Sprintf("Отслеживаемый маршрут: \n%s → %s\nДата: %s\nТип Вагона: %s\nКоличество Пассажиров: %d\nОтсек: %s\n%s\n%s\nНомер формы: %d", form.ArrivalPoint, form.DeparturePoint, fmt.Sprintf("%d %d %d", form.DepartureDate.Day(), form.DepartureDate.Month(), form.DepartureDate.Year()), form.CarriageType, form.NumberOfPassengers, compartmentNumberToString(form.CompartmentNumber), seats, strings.Join(formOptions, ",\n"), form.ID))
+		}
 	}
 }
