@@ -155,7 +155,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 				}
 
 				// sending ShelfType
-				sendShelfType(ctx, b, update, chatID)
+				sendShelfTypeHandler(ctx, b, update, chatID)
 
 			})
 
@@ -163,6 +163,7 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 
 			parsedCompartmentNumber, isValid := stringToCompartmentNumber(msg)
 			if !isValid {
+				log.Println(parsedCompartmentNumber)
 				sendMessage(ctx, b, update, "Перечислите отсек(и) через пробел (1-9)")
 				return
 			}
@@ -172,12 +173,37 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 				return
 			}
 
-			// sending  ShelfType ... TODO
-			sendShelfType(ctx, b, update, chatID)
+			// sending  ShelfType
+			sendShelfTypeHandler(ctx, b, update, chatID)
 
 		case 4: // user sent number for bottom shelf
-			updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
-		case 5: // user sent to track price change
+			form, err := getLastForm(chatID)
+			if err != nil {
+				log.Print("Error: start:4 could not get last(current) form", err)
+				return
+			}
+
+			numberOfPassengersBottomShefl, err := strconv.Atoi(msg)
+			if err != nil || !(numberOfPassengersBottomShefl >= 0 && numberOfPassengersBottomShefl <= 6) {
+				sendMessage(ctx, b, update, fmt.Sprintf("(Введите число от 0 до %d)", form.NumberOfPassengers))
+				return
+			}
+
+			if err := updateLastForm(chatID, FormUpdate{NumberOfPassengersBottomShefl: &numberOfPassengersBottomShefl}); err != nil {
+				log.Print("Error: start:4.1 could not update last form", err)
+				return
+			}
+
+			if err := updateLastForm(chatID, FormUpdate{NumberOfPassengersTopShefl: intPtr(int(form.NumberOfPassengers - numberOfPassengersBottomShefl))}); err != nil {
+				log.Print("Error: start:4.2 could not update last form", err)
+				return
+			}
+
+			sendMessage(ctx, b, update, fmt.Sprintf("Нижние полки: %d\nВерхние полки: %d", numberOfPassengersBottomShefl, form.NumberOfPassengers-numberOfPassengersBottomShefl))
+			sendTrackPriceChangeHandler(ctx, b, update, chatID)
+
+		case 5: // TODO
+
 			updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
 		default:
 			log.Println("Error: unknown session step state")
@@ -189,22 +215,60 @@ func messageHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	}
 }
 
-func sendShelfType(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64) {
+func sendShelfTypeHandler(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64) {
 	sendButtonList(ctx, b, update, []string{"Любое", "Указать нижние", "Указать верхние"}, "Какое размещение вас устроит?", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
 		if err := updateLastForm(chatID, FormUpdate{ShelfType: strPtr(string(data))}); err != nil {
-			log.Print("Error: start:?.1 could not update last form", err)
+			log.Print("Error: start:sendShelfTypeHandler could not update last form", err)
+			return
+		}
+
+		form, err := getLastForm(chatID)
+		if err != nil {
+			log.Print("Error: start:sendShelfTypeHandler could not get last(current) form", err)
 			return
 		}
 
 		if string(data) != "Любое" {
-			sendMessage(ctx, b, update, "Укажите количество пассажиров для нижней полки:\n(Введите число от 1 до 2)")
+			sendMessage(ctx, b, update, fmt.Sprintf("Укажите количество пассажиров для нижней полки:\n(Введите число от 0 до %d)", form.NumberOfPassengers))
 			updateSession(chatID, SessionUpdate{Step: intPtr(4)}) // next session step
 			return
 		}
 
-		sendMessage(ctx, b, update, "Отслеживать изменение цены?\n(Введите да или нет)")
-		updateSession(chatID, SessionUpdate{Step: intPtr(5)}) // next session step
+		sendTrackPriceChangeHandler(ctx, b, update, chatID)
 
+	})
+}
+
+func sendTrackPriceChangeHandler(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64) {
+	sendButtonList(ctx, b, update, []string{"Да", "Нет"}, "Отслеживать изменение цены?", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+		trackPriceChange := false
+		if string(data) == "Да" {
+			trackPriceChange = true
+		}
+
+		if err := updateLastForm(chatID, FormUpdate{TrackPriceChange: &trackPriceChange}); err != nil {
+			log.Print("Error: start:trackPriceChange could not update last form", err)
+			return
+		}
+
+		sendSuggestSimilarSeatsHandler(ctx, b, update, chatID)
+	})
+}
+
+func sendSuggestSimilarSeatsHandler(ctx context.Context, b *bot.Bot, update *models.Update, chatID int64) {
+	sendButtonList(ctx, b, update, []string{"Да", "Нет"}, "Предлагать похожие места?", func(ctx context.Context, b *bot.Bot, mes models.MaybeInaccessibleMessage, data []byte) {
+		suggestSimilarSeats := false
+		if string(data) == "Да" {
+			suggestSimilarSeats = true
+		}
+
+		if err := updateLastForm(chatID, FormUpdate{SuggestSimilarSeats: &suggestSimilarSeats}); err != nil {
+			log.Print("Error: start:suggestSimilarSeats could not update last form", err)
+			return
+		}
+
+		sendFormSaved(ctx, b, update)
+		updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
 	})
 }
 

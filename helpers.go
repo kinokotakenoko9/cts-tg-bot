@@ -32,11 +32,15 @@ func sendResposeIsInvalid(ctx context.Context, b *bot.Bot, update *models.Update
 }
 
 func sendInfo(ctx context.Context, b *bot.Bot, update *models.Update) {
-	sendMessage(ctx, b, update, "Type /start to start")
+	sendMessage(ctx, b, update, "Type /start to start") // TODO: better msg
+}
+
+func sendFormSaved(ctx context.Context, b *bot.Bot, update *models.Update) {
+	sendMessage(ctx, b, update, "Ваш запрос сохранён! 🚆Я уведомлю вас, как только появятся билеты, соответствующие вашим параметрам.\n\nДля просмотра списка отслеживаемых билетов используйте /list.")
 }
 
 func sendButtonList(ctx context.Context, b *bot.Bot, update *models.Update, names []string, text string, onSelect inline.OnSelect) {
-	citiesInlineKeyboard := inline.New(b, inline.NoDeleteAfterClick()) // TODO: bug here, remove inactive keyboards
+	citiesInlineKeyboard := inline.New(b) // TODO: bug here, remove inactive keyboards
 
 	for _, name := range names {
 		citiesInlineKeyboard.Row().Button(name, []byte(name), onSelect)
@@ -71,12 +75,12 @@ func bytesToIntsPtr(b []byte) *[]int {
 }
 func stringToCompartmentNumber(s string) ([]int, bool) {
 	parts := strings.Fields(s)
-	if len(parts) != 9 {
+	if len(parts) == 0 || len(parts) > 9 {
 		return nil, false
 	}
 
 	seen := make(map[int]bool)
-	ints := make([]int, 9)
+	ints := make([]int, len(parts))
 
 	for i, p := range parts {
 		n, err := strconv.Atoi(p)
