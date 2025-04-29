@@ -58,6 +58,7 @@ func main() {
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "start", bot.MatchTypeCommand, startHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "list", bot.MatchTypeCommand, listHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "status", bot.MatchTypeCommand, statusHandler)
 
 	b.Start(ctx)
 }

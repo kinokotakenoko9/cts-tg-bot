@@ -35,7 +35,7 @@ func sendResposeIsInvalid(ctx context.Context, b *bot.Bot, update *models.Update
 }
 
 func sendInfo(ctx context.Context, b *bot.Bot, update *models.Update) {
-	sendMessage(ctx, b, update, "Type /start to start") // TODO: better msg
+	sendMessage(ctx, b, update, "Введите команду /start, чтобы начать.") // TODO: better msg?
 }
 
 func sendFormSaved(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -156,6 +156,16 @@ func startMonitoring(ctx context.Context, b *bot.Bot, update *models.Update, cha
 		log.Print("Error: getting form state 1: ", err)
 		return
 	}
+
+	session, err := getSession(chatID)
+	if err != nil {
+		log.Println("Error: could not get session: ", err)
+		return
+	}
+
+	updatedSessionFormsStatus := append(session.FormsStatus, initFormState)
+	updateSession(chatID, SessionUpdate{FormsStatus: &updatedSessionFormsStatus})
+
 	go monitorForm(ctxm, ctx, b, update, chatID, form, initFormState)
 
 }
@@ -191,10 +201,6 @@ func getFormUrlParams(form Form) string {
 	return fmt.Sprintf("from=%s&to=%s&forward_date=%s&backward_date=&multimodal=0pagestyle=tav&timeout=10", cities[form.DeparturePoint], cities[form.ArrivalPoint], form.DepartureDate.Format("02.01.2006"))
 }
 
-type FormState struct {
-	Price string
-}
-
 // getTextContent extracts the text content of an HTML node and its children.
 func getTextContent(n *html.Node) string {
 	var text string
@@ -211,6 +217,7 @@ func getTextContent(n *html.Node) string {
 func getFromState(doc *html.Node, form Form) (FormState, error) {
 	departureDate := form.DepartureDate.Format("2006-01-02")
 	var formState FormState
+	formState.Date = form.DepartureDate
 	var foundPrice bool
 
 	// Function to recursively traverse the HTML nodes.
@@ -221,11 +228,14 @@ func getFromState(doc *html.Node, form Form) (FormState, error) {
 			thisDate, ok := getAttributeValue(n, "data-thisdate")
 			if ok && thisDate == departureDate {
 				// Found the correct <a> tag.
-				priceSpan := findChildWithAttribute(n, "span", "data-table", "Плац")
-				if priceSpan != nil {
-					formState.Price = getTextContent(priceSpan) // Get the price string directly
-					foundPrice = true
-					return // Stop traversing once we find the price.
+				priceDiv := findChildWithTag(n, "div", "otherprices__detail-price")
+				if priceDiv != nil {
+					priceSpan := findChildWithAttribute(priceDiv, "span", "data-table", "Плац")
+					if priceSpan != nil {
+						formState.Price = getTextContent(priceSpan) // Get the price string directly
+						foundPrice = true
+						return // Stop traversing once we find the price.
+					}
 				}
 			}
 		}
@@ -241,7 +251,7 @@ func getFromState(doc *html.Node, form Form) (FormState, error) {
 	traverse(doc) // Start the traversal from the root of the document.
 
 	if !foundPrice {
-		return FormState{}, fmt.Errorf("price not found for departure date: %s", departureDate)
+		return FormState{Date: form.DepartureDate, Price: "-"}, nil
 	}
 
 	return formState, nil
@@ -270,12 +280,25 @@ func findChildWithAttribute(n *html.Node, tag, attrKey, attrValue string) *html.
 	return nil
 }
 
+// findChildWithTag finds the first child of a node with a specific tag.
+func findChildWithTag(n *html.Node, tag, class string) *html.Node {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == tag {
+			if class == "" {
+				return c
+			}
+			if val, ok := getAttributeValue(c, "class"); ok && strings.Contains(val, class) {
+				return c
+			}
+		}
+	}
+	return nil
+}
+
 func monitorForm(ctxm, ctx context.Context, b *bot.Bot, update *models.Update, chatID int64, form Form, initialFormState FormState) {
-	ticker := time.NewTicker(10 * time.Millisecond)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	defer monitoringWaitGroup.Done()
-
-	log.Printf("Monitoring started for form %d (chat %d)", form.ID, chatID)
 
 	for {
 		select {

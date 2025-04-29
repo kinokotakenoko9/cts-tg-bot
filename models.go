@@ -32,13 +32,20 @@ type FormUpdate struct {
 	SuggestSimilarSeats           *bool
 }
 
+type FormState struct {
+	Price string
+	Date  time.Time
+}
+
 type Session struct {
-	Step    int
-	Command string // invariant: one of "none", and other
-	Forms   []Form
+	Step        int
+	Command     string // invariant: one of "none", and other
+	Forms       []Form
+	FormsStatus []FormState
 }
 
 type SessionUpdate struct {
-	Step    *int
-	Command *string
+	Step        *int
+	Command     *string
+	FormsStatus *[]FormState
 }

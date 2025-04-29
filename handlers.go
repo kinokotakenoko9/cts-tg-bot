@@ -360,3 +360,36 @@ func listHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 		}
 	}
 }
+
+// when user typed `/status`
+func statusHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	chatID := update.Message.Chat.ID
+
+	hasSession, err := userHasSession(chatID)
+	if err != nil {
+		log.Print("Error: could not check if user has session: ", err)
+		return
+	}
+
+	if !hasSession {
+		sendNoForms(ctx, b, update)
+		return
+	}
+
+	session, err := getSession(chatID)
+	if err != nil {
+		log.Println("Error: could not get session: ", err)
+		return
+	}
+
+	if session.Command != "none" {
+		sendResposeIsInvalid(ctx, b, update)
+	} else {
+
+		// sendMessage(ctx, b, update, "Список всех отслеживаемых форм:")
+		for _, formStatus := range session.FormsStatus {
+
+			sendMessage(ctx, b, update, fmt.Sprintf("Билеты на %s: \nПлацкарт: %s", formStatus.Date.Format("02 01 2006"), formStatus.Price))
+		}
+	}
+}

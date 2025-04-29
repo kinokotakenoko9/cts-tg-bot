@@ -101,6 +101,9 @@ func updateSession(chatID int64, update SessionUpdate) error {
 	if update.Command != nil {
 		session.Command = *update.Command
 	}
+	if update.FormsStatus != nil {
+		session.FormsStatus = *update.FormsStatus
+	}
 
 	data, err := json.Marshal(session)
 	if err != nil {
