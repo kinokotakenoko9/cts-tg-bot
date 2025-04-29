@@ -4,7 +4,7 @@ go 1.23.4
 
 require github.com/go-telegram/bot v1.14.2
 
-require golang.org/x/net v0.39.0 // indirect
+require golang.org/x/net v0.39.0
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

@@ -268,8 +268,15 @@ func sendSuggestSimilarSeatsHandler(ctx context.Context, b *bot.Bot, update *mod
 			return
 		}
 
+		form, err := getLastForm(chatID)
+		if err != nil {
+			log.Print("Error: start:suggestSimilarSeats could not get last(current) form", err)
+			return
+		}
+
 		sendFormSaved(ctx, b, update)
 		updateSession(chatID, SessionUpdate{Command: strPtr("none"), Step: intPtr(0)}) // next session step
+		startMonitoring(ctx, b, update, chatID, form)
 	})
 }
 
