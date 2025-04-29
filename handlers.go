@@ -356,7 +356,7 @@ func listHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 				formOptions = append(formOptions, "Только выбранные места")
 			}
 
-			sendMessage(ctx, b, update, fmt.Sprintf("Отслеживаемый маршрут: \n%s → %s\nДата: %s\nТип Вагона: %s\nКоличество Пассажиров: %d\nОтсек: %s\n%s\n%s\nНомер формы: %d", form.ArrivalPoint, form.DeparturePoint, fmt.Sprintf("%d %d %d", form.DepartureDate.Day(), form.DepartureDate.Month(), form.DepartureDate.Year()), form.CarriageType, form.NumberOfPassengers, compartmentNumberToString(form.CompartmentNumber), seats, strings.Join(formOptions, ",\n"), form.ID))
+			sendMessage(ctx, b, update, fmt.Sprintf("Отслеживаемый маршрут: \n%s → %s\nДата: %s\nТип Вагона: %s\nКоличество Пассажиров: %d\nОтсек: %s\n%s\n%s\nНомер формы: %d", form.DeparturePoint, form.ArrivalPoint, fmt.Sprintf("%d %d %d", form.DepartureDate.Day(), form.DepartureDate.Month(), form.DepartureDate.Year()), form.CarriageType, form.NumberOfPassengers, compartmentNumberToString(form.CompartmentNumber), seats, strings.Join(formOptions, ",\n"), form.ID))
 		}
 	}
 }
